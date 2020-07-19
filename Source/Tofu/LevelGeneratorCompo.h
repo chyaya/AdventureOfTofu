@@ -7,7 +7,8 @@
 #include "Sector.h"
 #include "LevelGeneratorCompo.generated.h"
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+
+UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class TOFU_API ULevelGeneratorCompo : public UActorComponent
 {
 	GENERATED_BODY()
@@ -20,6 +21,8 @@ protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
+	TSubclassOf<ASector> GetRandomSector(bool hasOpenedPosX, bool hasOpenedNegX, bool hasOpenedPosY, bool hasOpenedNegY);
+
 public:	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -27,16 +30,22 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void GenerateLevel(int width, int height, int startX, int startY);
 
-
-	ASector* GetRandomSector(bool hasOpenedPosX, bool hasOpenedNegX, bool hasOpenedPosY, bool hasOpenedNegY);
-
-
-	UPROPERTY(BlueprintReadWrite)
-	TArray<ASector*> SectorList;
-
-	UPROPERTY(BlueprintReadWrite)
-	ASector* StartingSector;
+	UFUNCTION(BlueprintCallable)
+	TSubclassOf<ASector> GetSector(int x, int y);
 	
-	TArray<ASector*> SectorGrid;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<TSubclassOf<ASector> > SectorList;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TSubclassOf<ASector> StartingSector;
+
+	UPROPERTY(BlueprintReadOnly)
+	int LevelWidth;
+
+	UPROPERTY(BlueprintReadOnly)
+	int LevelHeight;
+	
+	TArray<TSubclassOf<ASector> > SectorGrid;
 	TArray<bool> GridHasExpanded;
 };

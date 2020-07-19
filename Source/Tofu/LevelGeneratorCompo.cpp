@@ -32,19 +32,21 @@ void ULevelGeneratorCompo::TickComponent(float DeltaTime, ELevelTick TickType, F
 	// ...
 }
 
-ASector* ULevelGeneratorCompo::GetRandomSector(bool hasOpenedPosX, bool hasOpenedNegX, bool hasOpenedPosY, bool hasOpenedNegY)
+TSubclassOf<ASector> ULevelGeneratorCompo::GetRandomSector(bool hasOpenedPosX, bool hasOpenedNegX, bool hasOpenedPosY, bool hasOpenedNegY)
 {
-	TArray<ASector*> list;
+	TArray<TSubclassOf<ASector> > list;
 
-	for (ASector* sector : SectorList)
+	for (TSubclassOf<ASector> subclass : SectorList)
 	{
-		if (sector->HasOpenedPosX == hasOpenedPosX
-			&& sector->HasOpenedNegX == hasOpenedNegX
-			&& sector->HasOpenedPosY == hasOpenedPosY
-			&& sector->HasOpenedNegY == hasOpenedNegY)
-		{
-			list.Add(sector);
-		}
+		ASector* sector = Cast<ASector>(subclass->ClassDefaultObject);
+
+			if (sector->HasOpenedPosX == hasOpenedPosX
+				&& sector->HasOpenedNegX == hasOpenedNegX
+				&& sector->HasOpenedPosY == hasOpenedPosY
+				&& sector->HasOpenedNegY == hasOpenedNegY)
+			{
+				list.Add(subclass);
+			}
 	}
 
 	if (list.Num() == 0)
@@ -55,16 +57,35 @@ ASector* ULevelGeneratorCompo::GetRandomSector(bool hasOpenedPosX, bool hasOpene
 	return list[randN];
 }
 
+TSubclassOf<ASector> ULevelGeneratorCompo::GetSector(int x, int y)
+{
+	return SectorGrid[LevelWidth*y + x];
+}
+
 void ULevelGeneratorCompo::GenerateLevel(int width, int height, int startX, int startY)
 {
+	LevelWidth = width;
+	LevelHeight = height;
+
 	SectorGrid.SetNum(width*height, false);
 	GridHasExpanded.SetNum(width*height, false);
 
-	SectorGrid[width*startY + startX] = StartingSector;
-
 	TArray<TTuple<int, int> > queue;
 
-	queue.Add(MakeTuple(startX, startY));
+	SectorGrid[width*startY + startX] = StartingSector;
+	GridHasExpanded[width*startY + startX] = true;
+
+	if (nullptr == StartingSector)
+		return;
+
+	ASector* ssector = Cast<ASector>(StartingSector->ClassDefaultObject);
+
+	if (ssector->HasOpenedPosX)	queue.Add(MakeTuple(startX + 1, startY));
+	if (ssector->HasOpenedNegX)	queue.Add(MakeTuple(startX - 1, startY));
+	if (ssector->HasOpenedPosY)	queue.Add(MakeTuple(startX, startY + 1));
+	if (ssector->HasOpenedNegY)	queue.Add(MakeTuple(startX, startY - 1));
+
+	TTuple<int, int> dir[4] = { MakeTuple(1, 0), MakeTuple(-1, 0), MakeTuple(0, 1), MakeTuple(0, -1) };
 
 	while (queue.Num() > 0)
 	{
@@ -73,43 +94,52 @@ void ULevelGeneratorCompo::GenerateLevel(int width, int height, int startX, int 
 		int y = cur.Get<1>();
 		int idx = width * y + x;
 
-		if(GridHasExpanded[idx])
+		if (GridHasExpanded[idx])
 			continue;
 
-		ASector* sector = SectorGrid[idx];
+		bool open[4] = { false, };
 
-		if (sector->HasOpenedPosX)
+		for (int i = 0; i < 4; ++i)
 		{
-			queue.Add(MakeTuple(x + 1, y));
-		}
-		
-		if (sector->HasOpenedNegX)
-		{
-			queue.Add(MakeTuple(x - 1, y));
+			auto dx = dir[i].Get<0>();
+			auto dy = dir[i].Get<1>();
+
+			if (dx < 0)	open[i] = x > 0;
+			if (dx > 0)	open[i] = x < width - 1;
+			if (dy < 0)	open[i] = y > 0;
+			if (dy > 0)	open[i] = y < height - 1;
+
+			if (open[i])
+			{
+				TSubclassOf<ASector> subc = SectorGrid[width*(y + dy) + (x + dx)];
+				
+				if (subc)
+				{
+					ASector* s = Cast<ASector>(subc->ClassDefaultObject);
+
+					if (dx > 0)			open[i] = s->HasOpenedNegX;
+					else if (dx < 0)	open[i] = s->HasOpenedPosX;
+					else if (dy > 0)	open[i] = s->HasOpenedNegY;
+					else if (dy < 0)	open[i] = s->HasOpenedPosY;
+				}
+				else
+				{
+					open[i] = FMath::RandBool();
+				}
+			}
 		}
 
-		if (sector->HasOpenedPosY)
-		{
-			queue.Add(MakeTuple(x, y + 1));
-		}
+		TSubclassOf<ASector> randSubclass = GetRandomSector(open[0], open[1], open[2], open[3]);
+		ASector* randSector = Cast<ASector>(randSubclass->ClassDefaultObject);
 
-		if (sector->HasOpenedNegY)
-		{
-			queue.Add(MakeTuple(x, y - 1));
-		}
-		
-		SectorGrid[idx] = GetRandomSector(
-			sector->HasOpenedPosX && x < width - 1,
-			sector->HasOpenedNegX && x > 0,
-			sector->HasOpenedPosY && y < height - 1,
-			sector->HasOpenedNegY && y > 0);
+		if (randSector->HasOpenedPosX)	queue.Add(MakeTuple(x + 1, y));
+		if (randSector->HasOpenedNegX)	queue.Add(MakeTuple(x - 1, y));
+		if (randSector->HasOpenedPosY)	queue.Add(MakeTuple(x, y + 1));
+		if (randSector->HasOpenedNegY)	queue.Add(MakeTuple(x, y - 1));
 
+		SectorGrid[idx] = randSubclass;
 		GridHasExpanded[idx] = true;
 	}
-
-
-
-	//SectorGrid
 
 
 }
